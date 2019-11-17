@@ -2,7 +2,9 @@
 title: "Support Vector Machines(SVMs) Tutorial"
 author: "Sonali Narang"
 date: "11/12/2019"
-output: pdf_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -18,6 +20,7 @@ library(tidyverse)
 library(mlbench)
 library(caret)
 library(pROC)
+library(randomForest)
 ```
 
 ## The Breast Cancer Dataset
@@ -107,4 +110,99 @@ confusionMatrix(svm_test, reference = test_classification$Class)
 
 1. Choose an appropriate machine learning dataset and use SVM with two different kernels. Campare the results. 
 
+*Linear Kernel*
+```{r}
+data("PimaIndiansDiabetes")
+
+set.seed(1)
+train_size = floor(0.75 * nrow(PimaIndiansDiabetes))
+train_pos <- sample(seq_len(nrow(PimaIndiansDiabetes)), size = train_size)
+
+train_classification <- PimaIndiansDiabetes[train_pos, ]
+test_classification <- PimaIndiansDiabetes[-train_pos, ]
+
+```
+
+```{r}
+set.seed(1)
+control1 = trainControl(method = "repeatedcv", repeats = 5, classProbs = T, savePredictions = T)
+
+svm1 = train(diabetes ~ .,  data = train_classification, method = "svmLinear", tuneLength = 10, trControl = control1)
+
+svm1
+```
+
+```{r}
+roc(predictor = svm1$pred$pos, response = svm1$pred$obs)$auc
+
+plot(x = roc(predictor = svm1$pred$pos, response = svm1$pred$obs)$specificities, y = roc(predictor = svm1$pred$pos, response = svm1$pred$obs)$sensitivities, col= "blue", xlim = c(1, 0), type ="l", ylab = "Sensitivity", xlab = "Specificity")
+
+```
+
+```{r}
+svm_test1 = predict(svm1, newdata = test_classification)
+confusionMatrix(svm_test1, reference = test_classification$diabetes)
+```
+
+*radial kernel*
+```{r}
+set.seed(1)
+control2 = trainControl(method = "repeatedcv", repeats = 5, classProbs = T, savePredictions = T)
+
+svm2 = train(diabetes ~ .,  data = train_classification, method = "svmRadial", tuneLength = 10, trControl = control2)
+
+svm2
+```
+
+
+```{r}
+roc(predictor = svm2$pred$pos, response = svm2$pred$obs)$auc
+
+plot(x = roc(predictor = svm2$pred$pos, response = svm2$pred$obs)$specificities, y = roc(predictor = svm2$pred$pos, response = svm2$pred$obs)$sensitivities, col= "blue", xlim = c(1, 0), type ="l", ylab = "Sensitivity", xlab = "Specificity")
+
+```
+
+
+```{r}
+svm_test2 = predict(svm2, newdata = test_classification)
+confusionMatrix(svm_test2, reference = test_classification$diabetes)
+```
+
+For this particular dataset, it looks the accuracies using linear and radial kernels are approximately the same but linear performed slightly.
+
+
 2. Attempt using SVM after using a previously covered feature selection method. Do the results improve? Explain. 
+
+*Random Forest*
+```{r}
+set.seed(1)
+
+rfmodel = randomForest(diabetes ~ pregnant + glucose + pressure + triceps + insulin + mass + pedigree + age, data=train_classification,  importance = TRUE, oob.times = 15, confusion = TRUE)
+
+importance(rfmodel)
+```
+
+The most important features are glucose, mass, age, preganant and insulin.
+
+```{r}
+set.seed(1)
+control3 = trainControl(method = "repeatedcv", repeats = 5, classProbs = T, savePredictions = T)
+
+svm3 = train(diabetes ~ glucose + mass + age + pregnant + insulin,  data = train_classification, method = "svmLinear", tuneLength = 10, trControl = control3)
+
+svm3
+```
+
+```{r}
+roc(predictor = svm3$pred$pos, response = svm3$pred$obs)$auc
+
+plot(x = roc(predictor = svm3$pred$pos, response = svm3$pred$obs)$specificities, y = roc(predictor = svm3$pred$pos, response = svm3$pred$obs)$sensitivities, col= "blue", xlim = c(1, 0), type ="l", ylab = "Sensitivity", xlab = "Specificity")
+
+```
+
+```{r}
+svm_test3 = predict(svm3, newdata = test_classification)
+confusionMatrix(svm_test3, reference = test_classification$diabetes)
+```
+
+SVM with feature selection is comparable to SVM without feature selection in terms of accuracy. After removing several unimportant features, the accuracy does not decrease, nor does it increase.
